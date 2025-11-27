@@ -51,12 +51,16 @@ jobs:
         if: steps.check_tag.outputs.exists == 'false'
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        working-directory: packages/javascript
+        run: npm install
 
       - name: Publish to NPM
         if: steps.check_tag.outputs.exists == 'false'
-        working-directory: packages/vite-plugin
+        working-directory: packages/javascript
         run: npm publish --provenance --access public --no-git-checks
         env:
           NPM_CONFIG_PROVENANCE: true
