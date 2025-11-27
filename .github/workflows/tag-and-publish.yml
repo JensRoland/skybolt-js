@@ -1,0 +1,63 @@
+name: Tag and Publish
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'VERSION'
+  workflow_dispatch:
+
+jobs:
+  tag-and-publish:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write  # Required for NPM provenance
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: version
+        run: echo "version=$(cat VERSION | tr -d '[:space:]')" >> $GITHUB_OUTPUT
+
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and push tag
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+          echo "Created tag v${{ steps.version.outputs.version }}"
+
+      - name: Skip (tag exists)
+        if: steps.check_tag.outputs.exists == 'true'
+        run: echo "Tag v${{ steps.version.outputs.version }} already exists, skipping"
+
+      # Publish to NPM
+      - name: Setup Node.js
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish to NPM
+        if: steps.check_tag.outputs.exists == 'false'
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # Note: NPM provenance requires the repository to be public
+        # and id-token: write permission for OIDC

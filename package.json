@@ -1,0 +1,54 @@
+{
+  "name": "@skybolt/server-adapter",
+  "version": "3.3.0",
+  "description": "Skybolt server adapter for Node.js/Bun - High-performance asset caching for multi-page applications",
+  "type": "module",
+  "author": "Jens Roland <mail@jensroland.com> (https://jensroland.com)",
+  "license": "MIT",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./src/index.d.ts",
+        "default": "./src/index.js"
+      }
+    }
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "skybolt",
+    "caching",
+    "service-worker",
+    "performance",
+    "assets",
+    "node",
+    "bun",
+    "server-adapter",
+    "mpa",
+    "multi-page"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JensRoland/skybolt-js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JensRoland/skybolt-js/issues"
+  },
+  "homepage": "https://github.com/JensRoland/skybolt-js#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "peerDependencies": {
+    "@skybolt/vite-plugin": ">=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@skybolt/vite-plugin": {
+      "optional": true
+    }
+  }
+}
