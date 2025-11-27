@@ -11,7 +11,6 @@ on:
 jobs:
   tag-and-publish:
     runs-on: ubuntu-latest
-    environment: release
     permissions:
       contents: write
       id-token: write  # Required for NPM provenance
@@ -55,12 +54,10 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
-        working-directory: packages/javascript
         run: npm install
 
       - name: Publish to NPM
         if: steps.check_tag.outputs.exists == 'false'
-        working-directory: packages/javascript
         run: npm publish --provenance --access public --no-git-checks
         env:
           NPM_CONFIG_PROVENANCE: true
