@@ -7,7 +7,7 @@ Skybolt server adapter for Node.js and Bun. High-performance asset caching for m
 ```bash
 npm install @skybolt/server-adapter
 # or
-pnpm install @skybolt/server-adapter
+pnpm add @skybolt/server-adapter
 # or
 bun add @skybolt/server-adapter
 ```
