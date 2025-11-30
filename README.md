@@ -176,7 +176,7 @@ app.get('/', (req, res) => {
   `)
 })
 
-app.listen(3000)
+app.listen(8080)
 ```
 
 ### Hono (Bun)
@@ -247,7 +247,7 @@ fastify.get('/', (req, reply) => {
   `)
 })
 
-await fastify.listen({ port: 3000 })
+await fastify.listen({ port: 8080 })
 ```
 
 ## CDN Support

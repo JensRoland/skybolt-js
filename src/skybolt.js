@@ -19,8 +19,10 @@ import { readFileSync } from 'node:fs'
  */
 
 /**
- * @typedef {Object} ClientConfig
- * @property {string} script - Minified client launcher script
+ * @typedef {Object} LauncherConfig
+ * @property {string} url - URL path to the launcher script
+ * @property {string} hash - Content hash for cache invalidation
+ * @property {string} content - Minified client launcher script content
  */
 
 /**
@@ -36,7 +38,7 @@ import { readFileSync } from 'node:fs'
  * @property {string} skyboltVersion - Skybolt version used
  * @property {string} basePath - Base path for assets
  * @property {Record<string, Asset>} assets - Map of source paths to asset data
- * @property {ClientConfig} client - Client script configuration
+ * @property {LauncherConfig} launcher - Launcher script configuration
  * @property {ServiceWorkerConfig} serviceWorker - Service worker configuration
  */
 
@@ -76,6 +78,9 @@ export class Skybolt {
 
   /** @type {string | null} */
   #cdnUrl
+
+  /** @type {Map<string, {entry: string, hash: string}> | null} */
+  #urlToEntry = null
 
   /**
    * Create a new Skybolt instance.
@@ -251,6 +256,12 @@ export class Skybolt {
    * before `</body>`. It registers the Service Worker and processes any
    * inlined assets on the page.
    *
+   * On first visit (or cache miss), the launcher is inlined with `sb-asset`
+   * and `sb-url` attributes so the client can cache itself.
+   *
+   * On repeat visits (cache hit), returns an external script tag. The Service
+   * Worker will serve the launcher from cache (~5ms response time).
+   *
    * @returns {string} HTML string (meta tag + script tag)
    *
    * @example
@@ -264,6 +275,7 @@ export class Skybolt {
    */
   launchScript() {
     const swPath = this.#map.serviceWorker?.path ?? '/skybolt-sw.js'
+    const launcher = this.#map.launcher
 
     // Config meta tag for client script
     const meta = this.#buildTag('meta', {
@@ -271,8 +283,20 @@ export class Skybolt {
       content: JSON.stringify({ swPath })
     })
 
-    // Client launcher script (must be type="module" - client uses ES module syntax)
-    const script = this.#buildTag('script', { type: 'module' }, this.#map.client.script)
+    const url = this.#resolveUrl(launcher.url)
+
+    if (this.#hasCached('skybolt-launcher', launcher.hash)) {
+      // Repeat visit - use external script (SW serves from cache)
+      const script = this.#buildTag('script', { type: 'module', src: url }, '')
+      return meta + script
+    }
+
+    // First visit - inline with sb-asset and sb-url for self-caching
+    const script = this.#buildTag('script', {
+      type: 'module',
+      'sb-asset': `skybolt-launcher:${launcher.hash}`,
+      'sb-url': url
+    }, launcher.content)
 
     return meta + script
   }
@@ -337,6 +361,36 @@ export class Skybolt {
   }
 
   /**
+   * Check if an asset URL is currently cached by the client.
+   *
+   * This is useful for Chain Lightning integration where we need to check
+   * cache status by URL rather than source path.
+   *
+   * @param {string} url - The asset URL (e.g., '/assets/main-Abc123.css')
+   * @returns {boolean} True if the asset is cached
+   *
+   * @example
+   * ```javascript
+   * if (skybolt.isCachedUrl('/assets/main-Abc123.css')) {
+   *   // Client has this asset cached
+   * }
+   * ```
+   */
+  isCachedUrl(url) {
+    // Build URL to entry mapping if not already built
+    if (!this.#urlToEntry) {
+      this.#urlToEntry = new Map()
+      for (const [entry, asset] of Object.entries(this.#map.assets)) {
+        this.#urlToEntry.set(asset.url, { entry, hash: asset.hash })
+      }
+    }
+
+    const info = this.#urlToEntry.get(url)
+    if (!info) return false
+    return this.#hasCached(info.entry, info.hash)
+  }
+
+  /**
    * Resolve a URL with optional CDN prefix.
    *
    * @param {string} url - The URL to resolve
@@ -358,6 +412,19 @@ export class Skybolt {
    * @returns {boolean} True if cached with matching hash
    */
   #hasCached(entry, hash) {
+    return this.#cachedAssets.get(entry) === hash
+  }
+
+  /**
+   * Check if client has a specific entry:hash pair cached.
+   * Useful for external integrations (like Chain Lightning) that manage
+   * their own assets outside of Skybolt's render-map.
+   *
+   * @param {string} entry - Asset identifier (e.g., 'chain-lightning')
+   * @param {string} hash - Expected hash
+   * @returns {boolean} True if cached with matching hash
+   */
+  hasCachedEntry(entry, hash) {
     return this.#cachedAssets.get(entry) === hash
   }
 
