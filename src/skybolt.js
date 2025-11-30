@@ -5,7 +5,7 @@
  * Eliminates HTTP requests for cached assets on repeat visits.
  *
  * @module @skybolt/server-adapter
- * @version 3.3.0
+ * @version 3.4.0
  */
 
 import { readFileSync } from 'node:fs'

@@ -1,6 +1,6 @@
 {
   "name": "@skybolt/server-adapter",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "description": "Skybolt server adapter for Node.js/Bun - High-performance asset caching for multi-page applications",
   "type": "module",
   "author": "Jens Roland <mail@jensroland.com> (https://jensroland.com)",
