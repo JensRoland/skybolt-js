@@ -71,3 +71,10 @@ jobs:
           NPM_CONFIG_PROVENANCE: true
         # Note: NPM provenance requires the repository to be public
         # and id-token: write permission for OIDC
+
+      - name: Create GitHub Release
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          generate_release_notes: true
