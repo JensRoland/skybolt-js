@@ -5,10 +5,15 @@
  * Eliminates HTTP requests for cached assets on repeat visits.
  *
  * @module @skybolt/server-adapter
- * @version 3.4.0
+ * @version 3.5.0
  */
 
 import { readFileSync } from 'node:fs'
+import { CacheDigest } from './cache-digest.js'
+
+// ============================================================================
+// Skybolt Server Adapter
+// ============================================================================
 
 /**
  * @typedef {Object} Asset
@@ -73,8 +78,8 @@ export class Skybolt {
   /** @type {RenderMap} */
   #map
 
-  /** @type {Map<string, string>} */
-  #cachedAssets
+  /** @type {CacheDigest | null} */
+  #cacheDigest
 
   /** @type {string | null} */
   #cdnUrl
@@ -94,7 +99,9 @@ export class Skybolt {
     const content = readFileSync(renderMapPath, 'utf-8')
     this.#map = JSON.parse(content)
     this.#cdnUrl = cdnUrl ? cdnUrl.replace(/\/$/, '') : null
-    this.#cachedAssets = this.#parseCookies(cookies)
+
+    // Parse Cache Digest (Cuckoo filter) from sb_digest cookie
+    this.#cacheDigest = this.#parseCacheDigest(cookies)
   }
 
   /**
@@ -412,7 +419,24 @@ export class Skybolt {
    * @returns {boolean} True if cached with matching hash
    */
   #hasCached(entry, hash) {
-    return this.#cachedAssets.get(entry) === hash
+    if (!this.#cacheDigest) return false
+    return this.#cacheDigest.lookup(`${entry}:${hash}`)
+  }
+
+  /**
+   * Parse the sb_digest cookie (Cache Digest / Cuckoo filter).
+   *
+   * @param {Record<string, string> | null} cookies - Cookies object
+   * @returns {CacheDigest | null} Parsed filter or null if not present/invalid
+   */
+  #parseCacheDigest(cookies) {
+    if (!cookies) return null
+
+    const digest = cookies['sb_digest']
+    if (!digest) return null
+
+    const cd = CacheDigest.fromBase64(digest)
+    return cd.isValid() ? cd : null
   }
 
   /**
@@ -425,68 +449,8 @@ export class Skybolt {
    * @returns {boolean} True if cached with matching hash
    */
   hasCachedEntry(entry, hash) {
-    return this.#cachedAssets.get(entry) === hash
-  }
-
-  /**
-   * Parse the sb_assets cookie(s) into a map.
-   *
-   * Handles both single cookies and sharded cookies (sb_assets_2, etc.).
-   * Format: name:hash,name:hash,...
-   *
-   * @param {Record<string, string> | null} cookies - Cookies object
-   * @returns {Map<string, string>} Map of entry paths to hashes
-   */
-  #parseCookies(cookies) {
-    /** @type {Map<string, string>} */
-    const cached = new Map()
-
-    if (!cookies) return cached
-
-    // Check for sharded cookies
-    const countStr = cookies['sb_assets_count']
-    const count = countStr ? parseInt(countStr, 10) : 0
-
-    let cookieValue = ''
-
-    if (count > 1) {
-      // Sharded: combine sb_assets, sb_assets_2, sb_assets_3, ...
-      const parts = [cookies['sb_assets'] ?? '']
-      for (let i = 2; i <= count; i++) {
-        parts.push(cookies[`sb_assets_${i}`] ?? '')
-      }
-      cookieValue = parts.join('')
-    } else {
-      cookieValue = cookies['sb_assets'] ?? ''
-    }
-
-    if (!cookieValue) return cached
-
-    // URL decode
-    try {
-      cookieValue = decodeURIComponent(cookieValue)
-    } catch {
-      // Not encoded, use as-is
-    }
-
-    // Parse name:hash pairs
-    const pairs = cookieValue.split(',')
-    for (const pair of pairs) {
-      if (!pair) continue
-
-      // Find rightmost colon (handles Windows paths and entry names with colons)
-      const lastColon = pair.lastIndexOf(':')
-      if (lastColon === -1) continue
-
-      const name = pair.slice(0, lastColon)
-      const hash = pair.slice(lastColon + 1)
-
-      if (name && hash) {
-        cached.set(name, hash)
-      }
-    }
-
-    return cached
+    if (!this.#cacheDigest) return false
+    return this.#cacheDigest.lookup(`${entry}:${hash}`)
   }
 
   /**

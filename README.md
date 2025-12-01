@@ -191,11 +191,7 @@ const app = new Hono()
 app.use('/*', serveStatic({ root: './dist' }))
 
 app.get('/', (c) => {
-  const cookies = {}
-  for (const key of ['sb_assets', 'sb_assets_count', 'sb_assets_2', 'sb_assets_3']) {
-    const val = getCookie(c, key)
-    if (val) cookies[key] = val
-  }
+  const cookies = { sb_digest: getCookie(c, 'sb_digest') }
 
   const skybolt = new Skybolt('./dist/.skybolt/render-map.json', cookies)
 
